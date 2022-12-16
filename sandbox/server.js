@@ -10,7 +10,6 @@ function pipeFileToResponse(res, file, type) {
       'Content-Type': type
     });
   }
-
   fs.createReadStream(path.join(path.resolve() ,'sandbox', file)).pipe(res);
 }
 

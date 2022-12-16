@@ -1119,10 +1119,15 @@
       value: function use(fulfilled, rejected, options) {
         this.handlers.push({
           fulfilled: fulfilled,
+          // 成功
           rejected: rejected,
+          // 失败
+          // 默认异步 通过 synchronous 配置修改成同步
           synchronous: options ? options.synchronous : false,
+          // 运行时机
           runWhen: options ? options.runWhen : null
         });
+        // 通过索引作为 id 用来方便删除
         return this.handlers.length - 1;
       }
 
@@ -1223,7 +1228,9 @@
    * This leads to a problem when axios post `FormData` in webWorker
    */
   var isStandardBrowserWebWorkerEnv = function () {
-    return typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope && typeof self.importScripts === 'function';
+    return typeof WorkerGlobalScope !== 'undefined' &&
+    // eslint-disable-next-line no-undef
+    self instanceof WorkerGlobalScope && typeof self.importScripts === 'function';
   }();
   var platform = {
     isBrowser: true,
@@ -1355,7 +1362,7 @@
   }
   var defaults = {
     transitional: transitionalDefaults,
-    adapter: ['xhr', 'http'],
+    adapter: ['http', 'xhr'],
     transformRequest: [function transformRequest(data, headers) {
       var contentType = headers.getContentType() || '';
       var hasJSONContentType = contentType.indexOf('application/json') > -1;
@@ -2008,6 +2015,8 @@
     };
   }
   var isXHRAdapterSupported = typeof XMLHttpRequest !== 'undefined';
+
+  // xhr 适配器
   var xhrAdapter = isXHRAdapterSupported && function (config) {
     return new Promise(function dispatchXhrRequest(resolve, reject) {
       var requestData = config.data;
@@ -2196,38 +2205,50 @@
   utils.forEach(knownAdapters, function (fn, value) {
     if (fn) {
       try {
-        Object.defineProperty(fn, 'name', {
+        Object.defineProperty(fn, "name", {
           value: value
         });
       } catch (e) {
         // eslint-disable-next-line no-empty
       }
-      Object.defineProperty(fn, 'adapterName', {
+      Object.defineProperty(fn, "adapterName", {
         value: value
       });
     }
   });
   var adapters = {
-    getAdapter: function getAdapter(adapters) {
+    getAdapter: function getAdapter(
+    // 适配的平台
+    adapters) {
+      // 包装成数组
       adapters = utils.isArray(adapters) ? adapters : [adapters];
       var _adapters = adapters,
         length = _adapters.length;
       var nameOrAdapter;
       var adapter;
       for (var i = 0; i < length; i++) {
+        // 默认拿到的是名称
         nameOrAdapter = adapters[i];
-        if (adapter = utils.isString(nameOrAdapter) ? knownAdapters[nameOrAdapter.toLowerCase()] : nameOrAdapter) {
+        if (adapter = utils.isString(nameOrAdapter) ?
+        // 本地匹配
+        // 匹配到一个就 break 掉
+        knownAdapters[nameOrAdapter.toLowerCase()] :
+        // 当成适配器
+        nameOrAdapter) {
           break;
         }
       }
+
+      // 如果没有匹配到适配器
+      // 抛出错误
       if (!adapter) {
         if (adapter === false) {
-          throw new AxiosError("Adapter ".concat(nameOrAdapter, " is not supported by the environment"), 'ERR_NOT_SUPPORT');
+          throw new AxiosError("Adapter ".concat(nameOrAdapter, " is not supported by the environment"), "ERR_NOT_SUPPORT");
         }
         throw new Error(utils.hasOwnProp(knownAdapters, nameOrAdapter) ? "Adapter '".concat(nameOrAdapter, "' is not available in the build") : "Unknown adapter '".concat(nameOrAdapter, "'"));
       }
       if (!utils.isFunction(adapter)) {
-        throw new TypeError('adapter is not a function');
+        throw new TypeError("adapter is not a function");
       }
       return adapter;
     },
@@ -2258,21 +2279,28 @@
    * @returns {Promise} The Promise to be fulfilled
    */
   function dispatchRequest(config) {
+    // 边界情况排除
+    // TODO 看一下啥边界情况
     throwIfCancellationRequested(config);
     config.headers = AxiosHeaders$1.from(config.headers);
 
     // Transform request data
     config.data = transformData.call(config, config.transformRequest);
+
+    // 这几种方法需要添加头
     if (['post', 'put', 'patch'].indexOf(config.method) !== -1) {
       config.headers.setContentType('application/x-www-form-urlencoded', false);
     }
+
+    // 拿到 适配器
     var adapter = adapters.getAdapter(config.adapter || defaults$1.adapter);
     return adapter(config).then(function onAdapterResolution(response) {
       throwIfCancellationRequested(config);
 
-      // Transform response data
+      // 转换响应数据
       response.data = transformData.call(config, config.transformResponse, response);
       response.headers = AxiosHeaders$1.from(response.headers);
+      // 结束响应
       return response;
     }, function onAdapterRejection(reason) {
       if (!isCancel(reason)) {
@@ -2500,17 +2528,23 @@
       value: function request(configOrUrl, config) {
         /*eslint no-param-reassign:0*/
         // Allow for axios('example/url'[, config]) a la fetch API
-        if (typeof configOrUrl === 'string') {
+        // 判断是不是 string 类型
+        // 如果是 string 类型，就当成 url
+        if (typeof configOrUrl === "string") {
           config = config || {};
           config.url = configOrUrl;
         } else {
           config = configOrUrl || {};
         }
+        // 将 用户的 config 和 defaultConfig 合并
         config = mergeConfig(this.defaults, config);
         var _config = config,
           transitional = _config.transitional,
           paramsSerializer = _config.paramsSerializer,
           headers = _config.headers;
+        // TODO: 这里是啥 ？
+        // 不知道是啥 先不看
+        // 走了啥验证
         if (transitional !== undefined) {
           validator.assertOptions(transitional, {
             silentJSONParsing: validators.transitional(validators["boolean"]),
@@ -2518,45 +2552,66 @@
             clarifyTimeoutError: validators.transitional(validators["boolean"])
           }, false);
         }
+
+        // 用户想序列化`params`
         if (paramsSerializer !== undefined) {
           validator.assertOptions(paramsSerializer, {
             encode: validators["function"],
             serialize: validators["function"]
           }, true);
         }
-
-        // Set config.method
-        config.method = (config.method || this.defaults.method || 'get').toLowerCase();
+        // 设置请求方法
+        config.method = (config.method || this.defaults.method || "get").toLowerCase();
         var contextHeaders;
 
         // Flatten headers
+        // 用户配置 头 的话 跟 默认的头 合并
         contextHeaders = headers && utils.merge(headers.common, headers[config.method]);
-        contextHeaders && utils.forEach(['delete', 'get', 'head', 'post', 'put', 'patch', 'common'], function (method) {
+        contextHeaders && utils.forEach(["delete", "get", "head", "post", "put", "patch", "common"], function (method) {
           delete headers[method];
         });
+
+        // 给 配置 添加 headers
         config.headers = AxiosHeaders$1.concat(contextHeaders, headers);
 
         // filter out skipped interceptors
+        // 请求拦截器链
         var requestInterceptorChain = [];
         var synchronousRequestInterceptors = true;
+        // 遍历 请求拦截器
         this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
-          if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
+          if (
+          // 指定了运行时机
+          typeof interceptor.runWhen === "function" && interceptor.runWhen(config) === false) {
+            // 不执行
             return;
           }
+          // 判断注册的有没有需要同步执行的拦截器
           synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
+          // 从头部推进去
           requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
         });
+
+        // 相应拦截器链
         var responseInterceptorChain = [];
+        // 遍历 响应拦截器
         this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
           responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
         });
         var promise;
         var i = 0;
         var len;
+
+        // 如果拦截器里没有同步执行的任务
         if (!synchronousRequestInterceptors) {
+          // 初始化 任务链 把核心请求放在函数头部
           var chain = [dispatchRequest.bind(this), undefined];
+          // 在头部 推入 请求拦截器
           chain.unshift.apply(chain, requestInterceptorChain);
+          // 在尾部 推入 响应拦截器
           chain.push.apply(chain, responseInterceptorChain);
+          /** 这步完成之后 就能构成一个 请求拦截 -> 请求 -> 响应拦截 的任务队列 */
+          // 链的长度
           len = chain.length;
           promise = Promise.resolve(config);
           while (i < len) {
@@ -2578,6 +2633,7 @@
           }
         }
         try {
+          // 真正发送请求的地方
           promise = dispatchRequest.call(this, newConfig);
         } catch (error) {
           return Promise.reject(error);
@@ -2599,7 +2655,7 @@
     }]);
     return Axios;
   }(); // Provide aliases for supported request methods
-  utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  utils.forEach(["delete", "get", "head", "options"], function forEachMethodNoData(method) {
     /*eslint func-names:0*/
     Axios.prototype[method] = function (url, config) {
       return this.request(mergeConfig(config || {}, {
@@ -2609,7 +2665,7 @@
       }));
     };
   });
-  utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  utils.forEach(["post", "put", "patch"], function forEachMethodWithData(method) {
     /*eslint func-names:0*/
 
     function generateHTTPMethod(isForm) {
@@ -2617,7 +2673,7 @@
         return this.request(mergeConfig(config || {}, {
           method: method,
           headers: isForm ? {
-            'Content-Type': 'multipart/form-data'
+            "Content-Type": "multipart/form-data"
           } : {},
           url: url,
           data: data
@@ -2625,7 +2681,7 @@
       };
     }
     Axios.prototype[method] = generateHTTPMethod();
-    Axios.prototype[method + 'Form'] = generateHTTPMethod(true);
+    Axios.prototype[method + "Form"] = generateHTTPMethod(true);
   });
   var Axios$1 = Axios;
 
@@ -2783,6 +2839,79 @@
     return utils.isObject(payload) && payload.isAxiosError === true;
   }
 
+  var HttpStatusCode = {
+    Continue: 100,
+    SwitchingProtocols: 101,
+    Processing: 102,
+    EarlyHints: 103,
+    Ok: 200,
+    Created: 201,
+    Accepted: 202,
+    NonAuthoritativeInformation: 203,
+    NoContent: 204,
+    ResetContent: 205,
+    PartialContent: 206,
+    MultiStatus: 207,
+    AlreadyReported: 208,
+    ImUsed: 226,
+    MultipleChoices: 300,
+    MovedPermanently: 301,
+    Found: 302,
+    SeeOther: 303,
+    NotModified: 304,
+    UseProxy: 305,
+    Unused: 306,
+    TemporaryRedirect: 307,
+    PermanentRedirect: 308,
+    BadRequest: 400,
+    Unauthorized: 401,
+    PaymentRequired: 402,
+    Forbidden: 403,
+    NotFound: 404,
+    MethodNotAllowed: 405,
+    NotAcceptable: 406,
+    ProxyAuthenticationRequired: 407,
+    RequestTimeout: 408,
+    Conflict: 409,
+    Gone: 410,
+    LengthRequired: 411,
+    PreconditionFailed: 412,
+    PayloadTooLarge: 413,
+    UriTooLong: 414,
+    UnsupportedMediaType: 415,
+    RangeNotSatisfiable: 416,
+    ExpectationFailed: 417,
+    ImATeapot: 418,
+    MisdirectedRequest: 421,
+    UnprocessableEntity: 422,
+    Locked: 423,
+    FailedDependency: 424,
+    TooEarly: 425,
+    UpgradeRequired: 426,
+    PreconditionRequired: 428,
+    TooManyRequests: 429,
+    RequestHeaderFieldsTooLarge: 431,
+    UnavailableForLegalReasons: 451,
+    InternalServerError: 500,
+    NotImplemented: 501,
+    BadGateway: 502,
+    ServiceUnavailable: 503,
+    GatewayTimeout: 504,
+    HttpVersionNotSupported: 505,
+    VariantAlsoNegotiates: 506,
+    InsufficientStorage: 507,
+    LoopDetected: 508,
+    NotExtended: 510,
+    NetworkAuthenticationRequired: 511
+  };
+  Object.entries(HttpStatusCode).forEach(function (_ref) {
+    var _ref2 = _slicedToArray(_ref, 2),
+      key = _ref2[0],
+      value = _ref2[1];
+    HttpStatusCode[value] = key;
+  });
+  var HttpStatusCode$1 = HttpStatusCode;
+
   /**
    * Create an instance of Axios
    *
@@ -2791,20 +2920,21 @@
    * @returns {Axios} A new instance of Axios
    */
   function createInstance(defaultConfig) {
+    // 创建一个 Axios 实例
     var context = new Axios$1(defaultConfig);
+    // 让实例的 request 方法中的 this 指向 context
     var instance = bind(Axios$1.prototype.request, context);
 
-    // Copy axios.prototype to instance
+    // 拓展实例的属性
     utils.extend(instance, Axios$1.prototype, context, {
       allOwnKeys: true
     });
-
-    // Copy context to instance
     utils.extend(instance, context, null, {
       allOwnKeys: true
     });
 
-    // Factory for creating new instances
+    // 添加 create 方法
+    // 自己调用自己 之后合并一下用户的配置和默认配置
     instance.create = function create(instanceConfig) {
       return createInstance(mergeConfig(defaultConfig, instanceConfig));
     };
@@ -2845,6 +2975,7 @@
   axios.formToJSON = function (thing) {
     return formDataToJSON(utils.isHTMLForm(thing) ? new FormData(thing) : thing);
   };
+  axios.HttpStatusCode = HttpStatusCode$1;
   axios["default"] = axios;
 
   return axios;
